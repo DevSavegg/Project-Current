@@ -8,6 +8,8 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import studio.devsavegg.server.broadcaster.BroadcastService;
 import studio.devsavegg.server.broadcaster.BroadcastServiceImpl;
+import studio.devsavegg.server.friend.FriendService;
+import studio.devsavegg.server.friend.FriendServiceImpl;
 import studio.devsavegg.server.gateway.ChatServerInitializer;
 import studio.devsavegg.server.gateway.ClientCommand;
 import studio.devsavegg.server.registry.ClientRegistryService;
@@ -30,18 +32,21 @@ public class ServerMain {
     public void run() throws Exception {
         BlockingQueue<ClientCommand> controlQueue = new LinkedBlockingQueue<>();
 
+        // --- Instantiate Services ---
         CommandParser commandParser = new CommandParser();
         ClientRegistryService clientRegistry = new ClientRegistryServiceImpl();
         RoomRegistryService roomRegistry = new RoomRegistryServiceImpl();
-
         BroadcastService broadcastService = new BroadcastServiceImpl(clientRegistry, roomRegistry);
+        FriendService friendService = new FriendServiceImpl();
 
+        // --- Instantiate Resolver Service ---
         ResolverService resolverService = new ResolverService(
                 controlQueue,
                 commandParser,
                 clientRegistry,
                 roomRegistry,
-                broadcastService
+                broadcastService,
+                friendService
         );
         Thread resolverThread = new Thread(resolverService, "Resolver-Thread");
         resolverThread.start();
@@ -53,7 +58,7 @@ public class ServerMain {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
-                    .childHandler(new ChatServerInitializer(controlQueue)) // Pass queue to initializer
+                    .childHandler(new ChatServerInitializer(controlQueue))
                     .option(ChannelOption.SO_BACKLOG, 128)
                     .childOption(ChannelOption.SO_KEEPALIVE, true);
 

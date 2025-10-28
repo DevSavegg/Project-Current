@@ -25,6 +25,20 @@ public interface ClientRegistryService {
     Channel getChannel(String clientId);
 
     /**
+     * Sets a display name for the client.
+     * @param clientId The client's ID.
+     * @param username The new display name.
+     */
+    void setUsername(String clientId, String username);
+
+    /**
+     * Gets the client's display name.
+     * @param clientId The client's ID.
+     * @return The display name, or the client ID if not set.
+     */
+    String getUsername(String clientId);
+
+    /**
      * Sets the client's "active context" (the room or DM session they are in).
      * @param clientId The client's ID.
      * @param contextId A unique identifier for the context (e.g., "room-123", "dm-abc-xyz").

@@ -1,13 +1,13 @@
 package studio.devsavegg.server.gateway;
 
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
+import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
-import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 
 public class ChatGatewayHandler extends SimpleChannelInboundHandler<TextWebSocketFrame> {
@@ -23,10 +23,17 @@ public class ChatGatewayHandler extends SimpleChannelInboundHandler<TextWebSocke
      */
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-        if (evt instanceof WebSocketServerProtocolHandler.HandshakeComplete) {
+        if (evt instanceof WebSocketServerProtocolHandler.HandshakeComplete handshake) {
             System.out.println("[Gateway] Client connected: " + ctx.channel().remoteAddress());
 
-            ClientCommand connectCommand = new ClientCommand(ctx.channel(), CommandType.CONNECT, null);
+            String uri = handshake.requestUri();
+            QueryStringDecoder decoder = new QueryStringDecoder(uri);
+            Map<String, List<String>> params = decoder.parameters();
+
+            String initialUsername = getParam(params, "username");
+            // String password = getParam(params, "password"); // For future use
+
+            ClientCommand connectCommand = new ClientCommand(ctx.channel(), CommandType.CONNECT, initialUsername);
             putCommand(connectCommand);
         } else {
             super.userEventTriggered(ctx, evt);
@@ -60,7 +67,8 @@ public class ChatGatewayHandler extends SimpleChannelInboundHandler<TextWebSocke
      */
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        System.err.println("[Gateway] Error caught: " + cause.getMessage());
+        System.err.println("[Gateway] Unhandled exception caught:");
+        cause.printStackTrace();
 
         ClientCommand disconnectCommand = new ClientCommand(ctx.channel(), CommandType.DISCONNECT, null);
         putCommand(disconnectCommand);
@@ -75,8 +83,18 @@ public class ChatGatewayHandler extends SimpleChannelInboundHandler<TextWebSocke
         try {
             controlQueue.put(command);
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt(); // Reset interrupt status
+            Thread.currentThread().interrupt();
             System.err.println("[Gateway] Failed to enqueue command; queue thread interrupted.");
         }
+    }
+
+    /**
+     * Helper to safely get the first value of a query parameter.
+     */
+    private String getParam(Map<String, List<String>> params, String key) {
+        if (params.containsKey(key) && !params.get(key).isEmpty()) {
+            return params.get(key).getFirst();
+        }
+        return null;
     }
 }

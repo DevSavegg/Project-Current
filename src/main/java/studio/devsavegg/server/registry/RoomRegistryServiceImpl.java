@@ -1,12 +1,20 @@
 package studio.devsavegg.server.registry;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
-public class RoomRegistryServiceImpl implements RoomRegistryService{
-    private record Room(String id, String name, Set<String> members) {}
+public class RoomRegistryServiceImpl implements RoomRegistryService {
+    private record Room(
+            String id,
+            String name,
+            String inviteCode,
+            Set<String> members
+    ) {}
+
     private final Map<String, Room> rooms = new ConcurrentHashMap<>();
     private final Map<String, String> inviteCodes = new ConcurrentHashMap<>();
 
@@ -18,7 +26,7 @@ public class RoomRegistryServiceImpl implements RoomRegistryService{
         Set<String> members = ConcurrentHashMap.newKeySet();
         members.add(ownerClientId);
 
-        Room newRoom = new Room(roomId, roomName, members);
+        Room newRoom = new Room(roomId, roomName, inviteCode, members);
         rooms.put(roomId, newRoom);
         inviteCodes.put(inviteCode, roomId);
 
@@ -48,7 +56,7 @@ public class RoomRegistryServiceImpl implements RoomRegistryService{
         Room room = rooms.get(roomId);
         if (room != null) {
             room.members().remove(clientId);
-            System.out.println("[RoomRegistry] Client " + clientId + " left room: " + room.name());
+            System.out.println("[ClientRegistry] Client " + clientId + " left room: " + room.name());
         }
     }
 
@@ -57,7 +65,7 @@ public class RoomRegistryServiceImpl implements RoomRegistryService{
         for (Room room : rooms.values()) {
             room.members().remove(clientId);
         }
-        System.out.println("[RoomRegistry] Client " + clientId + " removed from all rooms.");
+        System.out.println("[ClientRegistry] Client " + clientId + " removed from all rooms.");
     }
 
     @Override
@@ -72,6 +80,12 @@ public class RoomRegistryServiceImpl implements RoomRegistryService{
     }
 
     @Override
+    public String getInviteCode(String roomId) {
+        Room room = rooms.get(roomId);
+        return (room != null) ? room.inviteCode() : null;
+    }
+
+    @Override
     public String getRoomName(String roomId) {
         Room room = rooms.get(roomId);
         return (room != null) ? room.name() : null;
@@ -81,6 +95,14 @@ public class RoomRegistryServiceImpl implements RoomRegistryService{
     public Set<String> getRoomMembers(String roomId) {
         Room room = rooms.get(roomId);
         return (room != null) ? room.members() : null;
+    }
+
+    @Override
+    public Collection<RoomInfo> getAllRooms() {
+        return rooms.values().stream()
+                .filter(room -> room.id().startsWith("room-"))
+                .map(room -> new RoomInfo(room.id(), room.name(), room.members().size()))
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -98,7 +120,8 @@ public class RoomRegistryServiceImpl implements RoomRegistryService{
             members.add(clientId1);
             members.add(clientId2);
             String dmName = "DM: " + clientId1 + " / " + clientId2;
-            return new Room(id, dmName, members);
+
+            return new Room(id, dmName, null, members);
         }).id();
     }
 

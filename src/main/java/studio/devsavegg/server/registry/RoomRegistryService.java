@@ -1,8 +1,17 @@
 package studio.devsavegg.server.registry;
 
+import java.util.Collection;
 import java.util.Set;
 
 public interface RoomRegistryService {
+
+    /**
+     * A simple data-transfer object for public room info.
+     * @param roomId The room's unique ID.
+     * @param roomName The room's display name.
+     * @param memberCount The number of members currently in the room.
+     */
+    record RoomInfo(String roomId, String roomName, int memberCount) {}
 
     /**
      * Creates a new room and returns the invite code.
@@ -13,7 +22,7 @@ public interface RoomRegistryService {
     String createRoom(String ownerClientId, String roomName);
 
     /**
-     * Adds a client to a room using an invite code.
+     * Adds a client to a room using an invitation code.
      * @param clientId The client joining.
      * @param inviteCode The invite code for the room.
      * @return The unique room ID if joined successfully, or null if code is invalid.
@@ -50,6 +59,13 @@ public interface RoomRegistryService {
     String getRoomId(String inviteCode);
 
     /**
+     * Gets the invite code for a room from its ID.
+     * @param roomId The room ID.
+     * @return The invite code, or null if invalid.
+     */
+    String getInviteCode(String roomId);
+
+    /**
      * Gets the display name for a room from its ID.
      * @param roomId The room ID.
      * @return The room name, or null if not found.
@@ -62,6 +78,12 @@ public interface RoomRegistryService {
      * @return A Set of client IDs, or null if room doesn't exist.
      */
     Set<String> getRoomMembers(String roomId);
+
+    /**
+     * Gets a list of all public rooms.
+     * @return A collection of RoomInfo objects.
+     */
+    Collection<RoomInfo> getAllRooms();
 
     /**
      * Finds or creates a unique DM session between two users.

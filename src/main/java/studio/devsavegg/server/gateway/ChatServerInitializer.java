@@ -22,15 +22,19 @@ public class ChatServerInitializer extends ChannelInitializer<SocketChannel> {
     protected void initChannel(SocketChannel ch) throws Exception {
         ChannelPipeline pipeline = ch.pipeline();
 
-        // --- HTTP Handlers ---
         pipeline.addLast(new HttpServerCodec());
-        pipeline.addLast(new HttpObjectAggregator(65536)); // 64kb max
+        pipeline.addLast(new HttpObjectAggregator(65536)); // Combines HTTP chunks
 
-        // --- WebSocket Handlers ---
         pipeline.addLast(new WebSocketServerCompressionHandler());
-        pipeline.addLast(new WebSocketServerProtocolHandler(WEBSOCKET_PATH, null, true));
 
-        // --- Application Logic Handler ---
+        pipeline.addLast(new WebSocketServerProtocolHandler(
+                WEBSOCKET_PATH,
+                null,
+                true,
+                65536,
+                true,
+                true
+        ));
         pipeline.addLast(new ChatGatewayHandler(controlQueue));
     }
 }

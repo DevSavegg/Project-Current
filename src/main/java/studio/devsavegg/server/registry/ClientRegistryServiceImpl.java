@@ -4,48 +4,78 @@ import io.netty.channel.Channel;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class ClientRegistryServiceImpl implements ClientRegistryService {
-    private final Map<String, Channel> clients = new ConcurrentHashMap<>();
+    private record Client(
+            Channel channel,
+            AtomicReference<String> username,
+            AtomicReference<String> context
+    ) {}
+
+    private final Map<String, Client> clients = new ConcurrentHashMap<>();
+
     private final Map<Channel, String> clientChannels = new ConcurrentHashMap<>();
-    private final Map<String, String> clientContexts = new ConcurrentHashMap<>();
 
     @Override
     public void registerClient(String clientId, Channel channel) {
-        clients.put(clientId, channel);
-        clientChannels.put(channel, clientId); // Add to reverse map
+        Client newClient = new Client(
+                channel,
+                new AtomicReference<>(clientId),
+                new AtomicReference<>(null)
+        );
+
+        clients.put(clientId, newClient);
+        clientChannels.put(channel, clientId);
         System.out.println("[ClientRegistry] Client registered: " + clientId);
     }
 
     @Override
     public void unregisterClient(String clientId) {
         if (clientId == null) return;
-        Channel channel = clients.remove(clientId);
-        if (channel != null) {
-            clientChannels.remove(channel);
+
+        Client client = clients.remove(clientId);
+
+        if (client != null) {
+            clientChannels.remove(client.channel());
         }
-        clientContexts.remove(clientId); // Clean up
         System.out.println("[ClientRegistry] Client unregistered: " + clientId);
     }
 
     @Override
     public Channel getChannel(String clientId) {
-        return clients.get(clientId);
+        Client client = clients.get(clientId);
+        return (client != null) ? client.channel() : null;
+    }
+
+    @Override
+    public void setUsername(String clientId, String username) {
+        Client client = clients.get(clientId);
+        if (client != null) {
+            client.username().set(username);
+            System.out.println("[ClientRegistry] Client " + clientId + " username set to: " + username);
+        }
+    }
+
+    @Override
+    public String getUsername(String clientId) {
+        Client client = clients.get(clientId);
+        return (client != null) ? client.username().get() : clientId;
     }
 
     @Override
     public void setClientContext(String clientId, String contextId) {
-        if (contextId == null) {
-            clientContexts.remove(clientId);
-        } else {
-            clientContexts.put(clientId, contextId);
+        Client client = clients.get(clientId);
+        if (client != null) {
+            client.context().set(contextId);
+            System.out.println("[ClientRegistry] Client " + clientId + " context set to: " + contextId);
         }
-        System.out.println("[ClientRegistry] Client " + clientId + " context set to: " + contextId);
     }
 
     @Override
     public String getClientContext(String clientId) {
-        return clientContexts.get(clientId);
+        Client client = clients.get(clientId);
+        return (client != null) ? client.context().get() : null;
     }
 
     @Override

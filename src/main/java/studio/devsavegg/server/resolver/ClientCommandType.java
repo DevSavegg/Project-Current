@@ -8,10 +8,18 @@ import java.util.stream.Stream;
 public enum ClientCommandType {
     CREATE_ROOM,
     JOIN_ROOM,
+    LEAVE_ROOM,
     SAY,
     DM,
     LIST,
     ADD_FRIEND,
+
+    ACCEPT_FRIEND,
+    REJECT_FRIEND, // Rejects an incoming request OR cancels an outgoing one
+    REMOVE_FRIEND,
+
+    SET_NAME,
+
     USER_INFO,
     ROOM_INFO,
     UNKNOWN; // Fallback for any command that isn't recognized

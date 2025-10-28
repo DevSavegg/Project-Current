@@ -1,17 +1,18 @@
 package studio.devsavegg.server.broadcaster;
 
-/**
- * The structured data object sent from the server to the client.
- * This record will be serialized to JSON.
- *
- * @param type    The type of message (SYSTEM, CHAT, DM).
- * @param sender  The ID of the user who sent it (null for SYSTEM).
- * @param context The context of the message (e.g., room name, or the other user's ID).
- * @param data    The main message content.
- */
-public record ServerPayload(
-        ServerPayloadType type,
-        String sender,
-        String context,
-        String data
-) {}
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+
+@JsonTypeInfo(
+        use = JsonTypeInfo.Id.NAME,
+        include = JsonTypeInfo.As.PROPERTY,
+        property = "type")
+@JsonSubTypes({
+        @JsonSubTypes.Type(value = SystemMessagePayload.class, name = "SYSTEM"),
+        @JsonSubTypes.Type(value = ChatMessagePayload.class, name = "CHAT"),
+        @JsonSubTypes.Type(value = DirectMessagePayload.class, name = "DM"),
+        @JsonSubTypes.Type(value = ErrorPayload.class, name = "ERROR")
+})
+public sealed interface ServerPayload
+        permits SystemMessagePayload, ChatMessagePayload, DirectMessagePayload, ErrorPayload {
+}

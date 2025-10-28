@@ -14,15 +14,10 @@ public class CommandParser {
         ClientCommandType command = ClientCommandType.fromString(commandString);
 
         if (parts.length == 1) {
-            if (command == ClientCommandType.LIST) {
-                return new ParsedCommand(command, commandString, Collections.emptyList(), null);
-            }
-
-            if (command == ClientCommandType.USER_INFO) {
-                return new ParsedCommand(command, commandString, Collections.emptyList(), null);
-            }
-
-            if (command == ClientCommandType.ROOM_INFO) {
+            if (command == ClientCommandType.LIST ||
+                    command == ClientCommandType.USER_INFO ||
+                    command == ClientCommandType.ROOM_INFO ||
+                    command == ClientCommandType.LEAVE_ROOM) {
                 return new ParsedCommand(command, commandString, Collections.emptyList(), null);
             }
 
@@ -32,30 +27,18 @@ public class CommandParser {
         return switch (command) {
             case SAY -> {
                 // Format: CMD <message...>
-                // e.g., "SAY Hello world"
                 String message = joinParts(parts, 1);
                 yield new ParsedCommand(command, commandString, Collections.emptyList(), message);
             }
-            case DM -> {
+            case DM, JOIN_ROOM, ADD_FRIEND, ACCEPT_FRIEND, REJECT_FRIEND, REMOVE_FRIEND, LIST, ROOM_INFO, USER_INFO -> {
                 // Format: CMD <arg1>
                 String targetUser = parts[1];
                 yield new ParsedCommand(command, commandString, List.of(targetUser), null);
             }
-            case CREATE_ROOM -> {
-                // Format: CMD <room name...>
-                String roomName = joinParts(parts, 1);
-                yield new ParsedCommand(command, commandString, List.of(roomName), null);
-            }
-            // JOIN_ROOM <arg1>
-            // ADD_FRIEND <arg1>
-            // LIST <arg1>
-            // ROOM_INFO <arg1>
-            // USER_INFO <arg1>
-            case JOIN_ROOM, ADD_FRIEND, LIST, ROOM_INFO, USER_INFO -> {
-                // Format: CMD <arg1>
-                // e.g., "JOIN_ROOM xyz-123"
-                String arg1 = parts[1];
-                yield new ParsedCommand(command, commandString, List.of(arg1), null);
+            case CREATE_ROOM, SET_NAME -> {
+                // Format: CMD <name...>
+                String arg = joinParts(parts, 1);
+                yield new ParsedCommand(command, commandString, List.of(arg), null);
             }
             default -> new ParsedCommand(ClientCommandType.UNKNOWN, commandString, Collections.emptyList(), payload);
         };
