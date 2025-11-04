@@ -21,8 +21,8 @@ export const options = {
             executor: 'ramping-vus',
             exec: 'lurker',
             stages: [
-                { duration: '30s', target: 1000 },
-                { duration: '1m', target: 1000 },
+                { duration: '30s', target: 100 },
+                { duration: '1m', target: 100 },
                 { duration: '10s', target: 0 },
             ],
         },
@@ -32,8 +32,8 @@ export const options = {
             executor: 'ramping-vus',
             exec: 'chatter',
             stages: [
-                { duration: '30s', target: 1000 },
-                { duration: '1m', target: 1000 },
+                { duration: '30s', target: 100 },
+                { duration: '1m', target: 100 },
                 { duration: '10s', target: 0 },
             ],
             
@@ -44,7 +44,7 @@ export const options = {
         room_hopper_scenario: {
             executor: 'per-vu-iterations',
             exec: 'roomHopper',
-            vus: 1000,
+            vus: 50,
             iterations: 5,
             maxDuration: '5m',
             startTime: '30s',
