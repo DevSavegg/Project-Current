@@ -18,6 +18,8 @@ public class RoomRegistryServiceImpl implements RoomRegistryService {
     private final Map<String, Room> rooms = new ConcurrentHashMap<>();
     private final Map<String, String> inviteCodes = new ConcurrentHashMap<>();
 
+    private final Map<String, Set<String>> clientToRooms = new ConcurrentHashMap<>();
+
     @Override
     public String createRoom(String ownerClientId, String roomName) {
         String roomId = "room-" + generateId();
@@ -30,7 +32,9 @@ public class RoomRegistryServiceImpl implements RoomRegistryService {
         rooms.put(roomId, newRoom);
         inviteCodes.put(inviteCode, roomId);
 
-        // System.out.println("[RoomRegistry] Room created: " + roomName + " (ID: " + roomId + ", Code: " + inviteCode + ")");
+        clientToRooms.computeIfAbsent(ownerClientId, k -> ConcurrentHashMap.newKeySet()).add(roomId);
+
+        //System.out.println("[RoomRegistry] Room created: " + roomName + " (ID: " + roomId + ", Code: " + inviteCode + ")");
         return inviteCode;
     }
 
@@ -47,7 +51,10 @@ public class RoomRegistryServiceImpl implements RoomRegistryService {
         }
 
         room.members().add(clientId);
-        // System.out.println("[RoomRegistry] Client " + clientId + " joined room: " + room.name());
+
+        clientToRooms.computeIfAbsent(clientId, k -> ConcurrentHashMap.newKeySet()).add(roomId);
+
+        //System.out.println("[RoomRegistry] Client " + clientId + " joined room: " + room.name());
         return room.id();
     }
 
@@ -56,22 +63,41 @@ public class RoomRegistryServiceImpl implements RoomRegistryService {
         Room room = rooms.get(roomId);
         if (room != null) {
             room.members().remove(clientId);
-            // System.out.println("[ClientRegistry] Client " + clientId + " left room: " + room.name());
+
+            Set<String> roomsForClient = clientToRooms.get(clientId);
+            if (roomsForClient != null) {
+                roomsForClient.remove(roomId);
+                if (roomsForClient.isEmpty()) {
+                    clientToRooms.remove(clientId);
+                }
+            }
+
+            //System.out.println("[ClientRegistry] Client " + clientId + " left room: " + room.name());
         }
     }
 
     @Override
     public void removeClientFromAllRooms(String clientId) {
-        for (Room room : rooms.values()) {
-            room.members().remove(clientId);
+        Set<String> roomsForClient = clientToRooms.remove(clientId);
+
+        if (roomsForClient != null) {
+            for (String roomId : roomsForClient) {
+                Room room = rooms.get(roomId);
+                if (room != null) {
+                    room.members().remove(clientId);
+                }
+            }
         }
-        // System.out.println("[ClientRegistry] Client " + clientId + " removed from all rooms.");
+        //System.out.println("[ClientRegistry] Client " + clientId + " removed from all rooms.");
     }
 
     @Override
     public boolean isClientInRoom(String clientId, String roomId) {
-        Room room = rooms.get(roomId);
-        return room != null && room.members().contains(clientId);
+        Set<String> roomsForClient = clientToRooms.get(clientId);
+        return roomsForClient != null && roomsForClient.contains(roomId);
+
+        // Room room = rooms.get(roomId);
+        // return room != null && room.members().contains(clientId);
     }
 
     @Override
@@ -115,11 +141,14 @@ public class RoomRegistryServiceImpl implements RoomRegistryService {
         }
 
         return rooms.computeIfAbsent(dmId, id -> {
-            // System.out.println("[RoomRegistry] Creating DM session: " + id);
+            //System.out.println("[RoomRegistry] Creating DM session: " + id);
             Set<String> members = ConcurrentHashMap.newKeySet();
             members.add(clientId1);
             members.add(clientId2);
             String dmName = "DM: " + clientId1 + " / " + clientId2;
+
+            clientToRooms.computeIfAbsent(clientId1, k -> ConcurrentHashMap.newKeySet()).add(id);
+            clientToRooms.computeIfAbsent(clientId2, k -> ConcurrentHashMap.newKeySet()).add(id);
 
             return new Room(id, dmName, null, members);
         }).id();
@@ -139,8 +168,6 @@ public class RoomRegistryServiceImpl implements RoomRegistryService {
         }
         return null;
     }
-
-    // --- Helpers ---
 
     private String generateId() {
         return UUID.randomUUID().toString();

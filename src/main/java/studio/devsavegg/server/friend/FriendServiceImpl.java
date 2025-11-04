@@ -1,12 +1,23 @@
 package studio.devsavegg.server.friend;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 public class FriendServiceImpl implements FriendService {
     private final Map<String, Friendship> friendships = new ConcurrentHashMap<>();
+
+    // Map<ClientId, Set<FriendId>>
+    private final Map<String, Set<String>> clientFriends = new ConcurrentHashMap<>();
+    // Map<ClientId, Set<RequesterId>>
+    private final Map<String, Set<String>> clientPendingIn = new ConcurrentHashMap<>();
+    // Map<ClientId, Set<TargetId>>
+    private final Map<String, Set<String>> clientPendingOut = new ConcurrentHashMap<>();
+
+    private Set<String> getSet(Map<String, Set<String>> map, String clientId) {
+        return map.computeIfAbsent(clientId, k -> ConcurrentHashMap.newKeySet());
+    }
 
     /**
      * Creates a canonical, alphabetized key for two user IDs.
@@ -39,12 +50,25 @@ public class FriendServiceImpl implements FriendService {
                 return existingFs;
             }
 
+            if (existingFs != null && existingFs.status() == FriendshipStatus.PENDING) {
+                String oldRequester = existingFs.requesterId();
+                String oldTarget = oldRequester.equals(existingFs.userA()) ? existingFs.userB() : existingFs.userA();
+                getSet(clientPendingOut, oldRequester).remove(oldTarget);
+                getSet(clientPendingIn, oldTarget).remove(oldRequester);
+            }
+
             String userA = (requesterId.compareTo(targetId) < 0) ? requesterId : targetId;
             String userB = (requesterId.compareTo(targetId) < 0) ? targetId : requesterId;
             return new Friendship(userA, userB, requesterId, FriendshipStatus.PENDING);
         });
 
-        return newFs.status() == FriendshipStatus.PENDING && newFs.requesterId().equals(requesterId);
+        if (newFs.status() == FriendshipStatus.PENDING && newFs.requesterId().equals(requesterId)) {
+            getSet(clientPendingOut, requesterId).add(targetId);
+            getSet(clientPendingIn, targetId).add(requesterId);
+            return true;
+        }
+
+        return false;
     }
 
     @Override
@@ -58,7 +82,16 @@ public class FriendServiceImpl implements FriendService {
             return existingFs;
         });
 
-        return updatedFs != null && updatedFs.status() == FriendshipStatus.ACCEPTED;
+        if (updatedFs != null && updatedFs.status() == FriendshipStatus.ACCEPTED) {
+            getSet(clientPendingOut, requesterId).remove(acceptorId);
+            getSet(clientPendingIn, acceptorId).remove(requesterId);
+
+            getSet(clientFriends, requesterId).add(acceptorId);
+            getSet(clientFriends, acceptorId).add(requesterId);
+            return true;
+        }
+
+        return false;
     }
 
     @Override
@@ -67,7 +100,13 @@ public class FriendServiceImpl implements FriendService {
 
         Friendship fs = friendships.get(key);
         if (fs != null && fs.status() == FriendshipStatus.PENDING) {
-            return friendships.remove(key, fs);
+            if (friendships.remove(key, fs)) {
+                String requester = fs.requesterId();
+                String target = requester.equals(fs.userA()) ? fs.userB() : fs.userA();
+                getSet(clientPendingOut, requester).remove(target);
+                getSet(clientPendingIn, target).remove(requester);
+                return true;
+            }
         }
         return false;
     }
@@ -78,7 +117,11 @@ public class FriendServiceImpl implements FriendService {
 
         Friendship fs = friendships.get(key);
         if (fs != null && fs.status() == FriendshipStatus.ACCEPTED) {
-            return friendships.remove(key, fs);
+            if (friendships.remove(key, fs)) {
+                getSet(clientFriends, removerId).remove(friendId);
+                getSet(clientFriends, friendId).remove(removerId);
+                return true;
+            }
         }
         return false;
     }
@@ -92,35 +135,38 @@ public class FriendServiceImpl implements FriendService {
 
         Friendship blockedFs = new Friendship(userA, userB, blockerId, FriendshipStatus.BLOCKED);
 
-        friendships.put(key, blockedFs);
+        Friendship oldFs = friendships.put(key, blockedFs);
+        if (oldFs != null) {
+            if (oldFs.status() == FriendshipStatus.ACCEPTED) {
+                getSet(clientFriends, userA).remove(userB);
+                getSet(clientFriends, userB).remove(userA);
+            }
+            if (oldFs.status() == FriendshipStatus.PENDING) {
+                String requester = oldFs.requesterId();
+                String target = requester.equals(userA) ? userB : userA;
+                getSet(clientPendingOut, requester).remove(target);
+                getSet(clientPendingIn, target).remove(requester);
+            }
+        }
+
         return true;
     }
 
     @Override
     public Set<String> listFriends(String clientId) {
-        return friendships.values().stream()
-                .filter(fs -> fs.status() == FriendshipStatus.ACCEPTED)
-                .filter(fs -> fs.userA().equals(clientId) || fs.userB().equals(clientId))
-                .map(fs -> fs.userA().equals(clientId) ? fs.userB() : fs.userA())
-                .collect(Collectors.toSet());
+        Set<String> friends = clientFriends.get(clientId);
+        return (friends != null) ? friends : Collections.emptySet();
     }
 
     @Override
     public Set<String> listPendingIncomingRequests(String clientId) {
-        return friendships.values().stream()
-                .filter(fs -> fs.status() == FriendshipStatus.PENDING)
-                .filter(fs -> fs.userA().equals(clientId) || fs.userB().equals(clientId))
-                .map(Friendship::requesterId)
-                .filter(s -> !s.equals(clientId))
-                .collect(Collectors.toSet());
+        Set<String> requests = clientPendingIn.get(clientId);
+        return (requests != null) ? requests : Collections.emptySet();
     }
 
     @Override
     public Set<String> listPendingOutgoingRequests(String clientId) {
-        return friendships.values().stream()
-                .filter(fs -> fs.status() == FriendshipStatus.PENDING)
-                .filter(fs -> fs.requesterId().equals(clientId))
-                .map(fs -> fs.userA().equals(clientId) ? fs.userB() : fs.userA())
-                .collect(Collectors.toSet());
+        Set<String> requests = clientPendingOut.get(clientId);
+        return (requests != null) ? requests : Collections.emptySet();
     }
 }
