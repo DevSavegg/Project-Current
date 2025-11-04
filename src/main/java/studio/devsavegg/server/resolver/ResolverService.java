@@ -40,7 +40,7 @@ public class ResolverService implements Runnable {
 
     @Override
     public void run() {
-        System.out.println("[ResolverService] Started.");
+        // System.out.println("[ResolverService] Started.");
         while (!Thread.currentThread().isInterrupted()) {
             ClientCommand command = null;
             try {
@@ -71,7 +71,7 @@ public class ResolverService implements Runnable {
                 }
             }
         }
-        System.out.println("[ResolverService] Stopped.");
+        // System.out.println("[ResolverService] Stopped.");
     }
 
     private void handleConnect(Channel channel, String initialUsername) {
@@ -99,7 +99,7 @@ public class ResolverService implements Runnable {
                     "You have pending friend requests from: " + pendingRequests);
         }
 
-        System.out.println("[ResolverService] Client connected: " + clientId + " (Name: " + finalUsername + ")");
+        // System.out.println("[ResolverService] Client connected: " + clientId + " (Name: " + finalUsername + ")");
     }
 
     private void handleDisconnect(Channel channel) {
@@ -114,7 +114,7 @@ public class ResolverService implements Runnable {
         roomRegistry.removeClientFromAllRooms(clientId);
         clientRegistry.unregisterClient(clientId);
 
-        System.out.println("[ResolverService] Client disconnected: " + clientId);
+        // System.out.println("[ResolverService] Client disconnected: " + clientId);
 
         if (currentContextId != null && currentContextId.startsWith("room-")) {
             broadcastService.broadcastSystemMessageToRoom(

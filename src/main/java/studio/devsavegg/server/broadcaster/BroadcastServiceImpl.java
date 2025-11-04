@@ -129,7 +129,7 @@ public class BroadcastServiceImpl implements BroadcastService {
 
     @Override
     public void shutdown() {
-        System.out.println("[BroadcastService] Shutting down worker pool...");
+        // System.out.println("[BroadcastService] Shutting down worker pool...");
         workerPool.shutdown();
     }
 

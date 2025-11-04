@@ -27,7 +27,7 @@ public class ClientRegistryServiceImpl implements ClientRegistryService {
 
         clients.put(clientId, newClient);
         clientChannels.put(channel, clientId);
-        System.out.println("[ClientRegistry] Client registered: " + clientId);
+        // System.out.println("[ClientRegistry] Client registered: " + clientId);
     }
 
     @Override
@@ -39,7 +39,7 @@ public class ClientRegistryServiceImpl implements ClientRegistryService {
         if (client != null) {
             clientChannels.remove(client.channel());
         }
-        System.out.println("[ClientRegistry] Client unregistered: " + clientId);
+        // System.out.println("[ClientRegistry] Client unregistered: " + clientId);
     }
 
     @Override
@@ -53,7 +53,7 @@ public class ClientRegistryServiceImpl implements ClientRegistryService {
         Client client = clients.get(clientId);
         if (client != null) {
             client.username().set(username);
-            System.out.println("[ClientRegistry] Client " + clientId + " username set to: " + username);
+            // System.out.println("[ClientRegistry] Client " + clientId + " username set to: " + username);
         }
     }
 
@@ -68,7 +68,7 @@ public class ClientRegistryServiceImpl implements ClientRegistryService {
         Client client = clients.get(clientId);
         if (client != null) {
             client.context().set(contextId);
-            System.out.println("[ClientRegistry] Client " + clientId + " context set to: " + contextId);
+            // System.out.println("[ClientRegistry] Client " + clientId + " context set to: " + contextId);
         }
     }
 

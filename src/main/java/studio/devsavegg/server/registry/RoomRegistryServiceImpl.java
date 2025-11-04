@@ -30,7 +30,7 @@ public class RoomRegistryServiceImpl implements RoomRegistryService {
         rooms.put(roomId, newRoom);
         inviteCodes.put(inviteCode, roomId);
 
-        System.out.println("[RoomRegistry] Room created: " + roomName + " (ID: " + roomId + ", Code: " + inviteCode + ")");
+        // System.out.println("[RoomRegistry] Room created: " + roomName + " (ID: " + roomId + ", Code: " + inviteCode + ")");
         return inviteCode;
     }
 
@@ -47,7 +47,7 @@ public class RoomRegistryServiceImpl implements RoomRegistryService {
         }
 
         room.members().add(clientId);
-        System.out.println("[RoomRegistry] Client " + clientId + " joined room: " + room.name());
+        // System.out.println("[RoomRegistry] Client " + clientId + " joined room: " + room.name());
         return room.id();
     }
 
@@ -56,7 +56,7 @@ public class RoomRegistryServiceImpl implements RoomRegistryService {
         Room room = rooms.get(roomId);
         if (room != null) {
             room.members().remove(clientId);
-            System.out.println("[ClientRegistry] Client " + clientId + " left room: " + room.name());
+            // System.out.println("[ClientRegistry] Client " + clientId + " left room: " + room.name());
         }
     }
 
@@ -65,7 +65,7 @@ public class RoomRegistryServiceImpl implements RoomRegistryService {
         for (Room room : rooms.values()) {
             room.members().remove(clientId);
         }
-        System.out.println("[ClientRegistry] Client " + clientId + " removed from all rooms.");
+        // System.out.println("[ClientRegistry] Client " + clientId + " removed from all rooms.");
     }
 
     @Override
@@ -115,7 +115,7 @@ public class RoomRegistryServiceImpl implements RoomRegistryService {
         }
 
         return rooms.computeIfAbsent(dmId, id -> {
-            System.out.println("[RoomRegistry] Creating DM session: " + id);
+            // System.out.println("[RoomRegistry] Creating DM session: " + id);
             Set<String> members = ConcurrentHashMap.newKeySet();
             members.add(clientId1);
             members.add(clientId2);

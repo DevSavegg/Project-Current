@@ -24,7 +24,7 @@ public class ChatGatewayHandler extends SimpleChannelInboundHandler<TextWebSocke
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
         if (evt instanceof WebSocketServerProtocolHandler.HandshakeComplete handshake) {
-            System.out.println("[Gateway] Client connected: " + ctx.channel().remoteAddress());
+            // System.out.println("[Gateway] Client connected: " + ctx.channel().remoteAddress());
 
             String uri = handshake.requestUri();
             QueryStringDecoder decoder = new QueryStringDecoder(uri);
@@ -56,7 +56,7 @@ public class ChatGatewayHandler extends SimpleChannelInboundHandler<TextWebSocke
      */
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        System.out.println("[Gateway] Client disconnected: " + ctx.channel().remoteAddress());
+        // System.out.println("[Gateway] Client disconnected: " + ctx.channel().remoteAddress());
 
         ClientCommand disconnectCommand = new ClientCommand(ctx.channel(), CommandType.DISCONNECT, null);
         putCommand(disconnectCommand);
