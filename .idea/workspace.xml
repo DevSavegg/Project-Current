@@ -5,7 +5,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="cd5ae213-7670-4465-bcf6-730cd8721640" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/registry/RoomRegistryServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/registry/RoomRegistryServiceImpl.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/ServerMain.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/ServerMain.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/gateway/ChatGatewayHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/gateway/ChatGatewayHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/gateway/ChatServerInitializer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/gateway/ChatServerInitializer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/resolver/ResolverService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/resolver/ResolverService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test/load-test.js" beforeDir="false" afterPath="$PROJECT_DIR$/test/load-test.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test/results/test-250-vu.txt" beforeDir="false" afterPath="$PROJECT_DIR$/test/results/test-250-vu.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -51,6 +58,27 @@
     &quot;settings.editor.selected.configurable&quot;: &quot;org.jetbrains.plugins.github.ui.GithubSettingsConfigurable&quot;
   }
 }</component>
+  <component name="RunManager">
+    <configuration name="Main" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="studio.devsavegg.Main" />
+      <module name="chat.current" />
+      <option name="VM_PARAMETERS" value="-Xms8G -Xmx8G -XX:+UseZGC -Xlog:gc*:file=zgc.log" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="studio.devsavegg.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Application.Main" />
+      </list>
+    </recent_temporary>
+  </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="cd5ae213-7670-4465-bcf6-730cd8721640" name="Changes" comment="" />

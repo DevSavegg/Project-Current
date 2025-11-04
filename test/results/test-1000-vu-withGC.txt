@@ -1,0 +1,73 @@
+
+         /\      Grafana   /‾‾/
+    /\  /  \     |\  __   /  /
+   /  \/    \    | |/ /  /   ‾‾\
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/
+
+     execution: local
+        script: .\load-test.js
+        output: -
+
+     scenarios: (100.00%) 3 scenarios, 1000 max VUs, 6m0s max duration (incl. graceful stop):
+              * lurker_scenario: Up to 400 looping VUs for 1m40s over 3 stages (gracefulRampDown: 30s, exec: lurker, gracefulStop: 30s)
+              * chatter_scenario: Up to 400 looping VUs for 1m40s over 3 stages (gracefulRampDown: 30s, exec: chatter, startTime: 30s, gracefulStop: 30s)
+              * room_hopper_scenario: 5 iterations for each of 200 VUs (maxDuration: 5m0s, exec: roomHopper, startTime: 30s, gracefulStop: 30s)
+
+INFO[0000] --- k6 setup starting ---                     source=console
+INFO[0000] [setup] WebSocket connected. Creating main room...  source=console
+INFO[0000] [setup] Main room created. Invite code: cc11fe8f  source=console
+INFO[0000] [setup] WebSocket closed. Returning data to VUs.  source=console
+
+
+  █ THRESHOLDS
+
+    checks
+    ✓ 'rate>0.95' rate=100.00%
+
+    ws_msgs_error
+    ✓ 'count==0' count=0
+
+
+  █ TOTAL RESULTS
+
+    checks_total.......: 8725679 54468.705415/s
+    checks_succeeded...: 100.00% 8725679 out of 8725679
+    checks_failed......: 0.00%   0 out of 8725679
+
+    ✓ payload is not ERROR
+    ✓ extracted client ID
+    ✓ hopper extracted invite code
+    ✓ Hopper WS connection successful
+
+    CUSTOM
+    create_room_duration_ms...: avg=64.09ms min=0s       med=49ms   max=478ms    p(90)=140ms   p(95)=175.14ms
+    join_room_duration_ms.....: avg=1.68ms  min=0s       med=2ms    max=4ms      p(90)=2ms     p(95)=3ms
+
+    EXECUTION
+    iteration_duration........: avg=14.56s  min=14s      med=14.54s max=15.48s   p(90)=15.01s  p(95)=15.15s
+    iterations................: 1000    6.242346/s
+    vus.......................: 11      min=10         max=1000
+    vus_max...................: 1000    min=1000       max=1000
+
+    NETWORK
+    data_received.............: 1.4 GB  8.9 MB/s
+    data_sent.................: 1.1 MB  6.9 kB/s
+
+    WEBSOCKET
+    ws_connecting.............: avg=20.55ms min=0s       med=3.5ms  max=467.46ms p(90)=52.18ms p(95)=85.47ms
+    ws_msgs_chat..............: 6433463 40159.900558/s
+    ws_msgs_error.............: 0       0/s
+    ws_msgs_received..........: 8721909 54445.171771/s
+    ws_msgs_sent..............: 15920   99.378145/s
+    ws_msgs_system............: 2288425 14285.140124/s
+    ws_session_duration.......: avg=14.44s  min=194.12ms med=14.4s  max=15.46s   p(90)=14.86s  p(95)=15s
+    ws_sessions...............: 1801    11.242465/s
+
+
+
+
+running (2m40.2s), 0000/1000 VUs, 1000 complete and 800 interrupted iterations
+lurker_scenario      ✓ [======================================] 001/400 VUs  1m40s
+chatter_scenario     ✓ [======================================] 000/400 VUs  1m40s
+room_hopper_scenario ✓ [======================================] 200 VUs      1m14.0s/5m0s  1000/1000 iters, 5 per VU

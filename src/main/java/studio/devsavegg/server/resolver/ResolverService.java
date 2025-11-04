@@ -5,6 +5,7 @@ import studio.devsavegg.server.broadcaster.BroadcastService;
 import studio.devsavegg.server.friend.FriendService;
 import studio.devsavegg.server.friend.FriendshipStatus;
 import studio.devsavegg.server.gateway.ClientCommand;
+import studio.devsavegg.server.gateway.CommandType;
 import studio.devsavegg.server.registry.ClientRegistryService;
 import studio.devsavegg.server.registry.RoomRegistryService;
 
@@ -16,21 +17,25 @@ import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.stream.Collectors;
 
-public class ResolverService implements Runnable {
-    private final BlockingQueue<ClientCommand> controlQueue;
+/**
+ * ResolverService is now a thread-safe, stateless service.
+ * It does not have its own thread, but provides methods
+ * that are called *by* the worker threads.
+ */
+public class ResolverService {
+
+    // --- Services are all thread-safe or effectively final ---
     private final CommandParser commandParser;
     private final ClientRegistryService clientRegistry;
     private final RoomRegistryService roomRegistry;
     private final BroadcastService broadcastService;
     private final FriendService friendService;
 
-    public ResolverService(BlockingQueue<ClientCommand> controlQueue,
-                           CommandParser commandParser,
+    public ResolverService(CommandParser commandParser,
                            ClientRegistryService clientRegistry,
                            RoomRegistryService roomRegistry,
                            BroadcastService broadcastService,
                            FriendService friendService) {
-        this.controlQueue = controlQueue;
         this.commandParser = commandParser;
         this.clientRegistry = clientRegistry;
         this.roomRegistry = roomRegistry;
@@ -38,40 +43,97 @@ public class ResolverService implements Runnable {
         this.friendService = friendService;
     }
 
-    @Override
-    public void run() {
-        // System.out.println("[ResolverService] Started.");
-        while (!Thread.currentThread().isInterrupted()) {
-            ClientCommand command = null;
-            try {
-                command = controlQueue.take();
+    public void processCommand(ClientCommand command) {
+        try {
+            switch (command.commandType()) {
+                case CONNECT:
+                    handleConnect(command.channel(), command.payload());
+                    break;
+                case DISCONNECT:
+                    handleDisconnect(command.channel());
+                    break;
+                case MESSAGE:
+                    handleClientMessage(command.channel(), command.payload());
+                    break;
+            }
+        } catch (Exception e) {
+            System.err.println("[ResolverService] CRITICAL ERROR processing command: " + e.getMessage());
+            e.printStackTrace();
 
-                switch (command.commandType()) {
-                    case CONNECT:
-                        handleConnect(command.channel(), command.payload());
-                        break;
-                    case DISCONNECT:
-                        handleDisconnect(command.channel());
-                        break;
-                    case MESSAGE:
-                        handleClientMessage(command.channel(), command.payload());
-                        break;
-                }
-            } catch (Exception e) {
-                System.err.println("[ResolverService] CRITICAL ERROR processing command: " + e.getMessage());
-                e.printStackTrace();
+            broadcastService.sendError(
+                    command.channel(),
+                    500,
+                    (command.payload() != null ? command.payload() : "UNKNOWN"),
+                    "An internal server error occurred while processing your request."
+            );
+        }
+    }
 
-                if (command != null) {
-                    broadcastService.sendError(
-                            command.channel(),
-                            500,
-                            (command.payload() != null ? command.payload() : "UNKNOWN"),
-                            "An internal server error occurred while processing your request."
-                    );
+    public void processManagementCommand(ClientCommand command) {
+        processCommand(command);
+    }
+
+    public static class ConnectionWorker implements Runnable {
+        private final BlockingQueue<ClientCommand> queue;
+        private final ResolverService resolver;
+        public ConnectionWorker(BlockingQueue<ClientCommand> queue, ResolverService resolver) {
+            this.queue = queue;
+            this.resolver = resolver;
+        }
+        @Override
+        public void run() {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    ClientCommand command = queue.take();
+                    resolver.processCommand(command);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
                 }
             }
         }
-        // System.out.println("[ResolverService] Stopped.");
+    }
+
+    public static class ManagementWorker implements Runnable {
+        private final BlockingQueue<ClientCommand> queue;
+        private final ResolverService resolver;
+        public ManagementWorker(BlockingQueue<ClientCommand> queue, ResolverService resolver) {
+            this.queue = queue;
+            this.resolver = resolver;
+        }
+        @Override
+        public void run() {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    ClientCommand command = queue.take();
+                    resolver.processManagementCommand(command);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+    }
+
+    public static class MessageWorker implements Runnable {
+        private final BlockingQueue<ClientCommand> queue;
+        private final ResolverService resolver;
+        public MessageWorker(BlockingQueue<ClientCommand> queue, ResolverService resolver) {
+            this.queue = queue;
+            this.resolver = resolver;
+        }
+        @Override
+        public void run() {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    ClientCommand command = queue.take();
+                    resolver.processCommand(command);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
     }
 
     private void handleConnect(Channel channel, String initialUsername) {
@@ -99,7 +161,7 @@ public class ResolverService implements Runnable {
                     "You have pending friend requests from: " + pendingRequests);
         }
 
-        // System.out.println("[ResolverService] Client connected: " + clientId + " (Name: " + finalUsername + ")");
+        //System.out.println("[ResolverService] Client connected: " + clientId + " (Name: " + finalUsername + ")");
     }
 
     private void handleDisconnect(Channel channel) {
@@ -114,7 +176,7 @@ public class ResolverService implements Runnable {
         roomRegistry.removeClientFromAllRooms(clientId);
         clientRegistry.unregisterClient(clientId);
 
-        // System.out.println("[ResolverService] Client disconnected: " + clientId);
+        //System.out.println("[ResolverService] Client disconnected: " + clientId);
 
         if (currentContextId != null && currentContextId.startsWith("room-")) {
             broadcastService.broadcastSystemMessageToRoom(
@@ -171,7 +233,7 @@ public class ResolverService implements Runnable {
                 handleRemoveFriend(clientId, command.args().getFirst());
                 break;
             case SET_NAME:
-                handleSetName(clientId, command.args().get(0));
+                handleSetName(clientId, command.args().getFirst());
                 break;
             case USER_INFO:
                 handleUserInfo(clientId, command.args());

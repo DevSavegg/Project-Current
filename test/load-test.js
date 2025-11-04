@@ -21,8 +21,8 @@ export const options = {
             executor: 'ramping-vus',
             exec: 'lurker',
             stages: [
-                { duration: '30s', target: 100 },
-                { duration: '1m', target: 100 },
+                { duration: '30s', target: 400 },
+                { duration: '1m', target: 400 },
                 { duration: '10s', target: 0 },
             ],
         },
@@ -32,8 +32,8 @@ export const options = {
             executor: 'ramping-vus',
             exec: 'chatter',
             stages: [
-                { duration: '30s', target: 100 },
-                { duration: '1m', target: 100 },
+                { duration: '30s', target: 400 },
+                { duration: '1m', target: 400 },
                 { duration: '10s', target: 0 },
             ],
             
@@ -44,7 +44,7 @@ export const options = {
         room_hopper_scenario: {
             executor: 'per-vu-iterations',
             exec: 'roomHopper',
-            vus: 50,
+            vus: 200,
             iterations: 5,
             maxDuration: '5m',
             startTime: '30s',
@@ -238,7 +238,9 @@ export function roomHopper(data) {
     group('Room Hopper Lifecycle', () => {
         const res = ws.connect(url, null, (socket) => {
             let myClientId = null;
-            let roomHasBeenCreated = false;
+            let createTime = null;
+
+            let state = 'WAITING_FOR_WELCOME';
 
             socket.on('open', () => {
                 // console.log(`VU ${__VU} (Hopper): Connected.`);
@@ -251,54 +253,48 @@ export function roomHopper(data) {
                     return;
                 }
 
-                // State 1: Waiting for WELCOME
-                if (payload.type === 'SYSTEM' && payload.subType === 'WELCOME') {
+                // --- State Machine ---
+
+                if (state === 'WAITING_FOR_WELCOME' && payload.type === 'SYSTEM' && payload.subType === 'WELCOME') {
                     myClientId = payload.message.split(': ').pop();
                     check(myClientId, { 'extracted client ID': (id) => id && id.startsWith('user-') });
 
-                    // 1. Create a new room
-                    const createTime = Date.now();
+                    createTime = Date.now();
                     const roomName = `k6_hopper_room_${__VU}_${__ITER}`;
                     socket.send(`create_room ${roomName}`);
                     
-                    // State 2: Waiting for the room to be created.
-                    socket.on('message', (creationMessage) => {
-                        if (roomHasBeenCreated) return;
-                        
-                        const creationPayload = JSON.parse(creationMessage);
-                        
-                        processCommonPayload(creationPayload, __VU); 
+                    state = 'WAITING_FOR_ROOM_CREATION';
 
-                        if (creationPayload.type === 'SYSTEM' && creationPayload.subType === 'ROOM_CREATED') {
-                            roomHasBeenCreated = true;
-                            createRoomTrend.add(Date.now() - createTime);
+                } else if (state === 'WAITING_FOR_ROOM_CREATION' && payload.type === 'SYSTEM' && payload.subType === 'ROOM_CREATED') {
+                    state = 'IN_ROOM'; 
+                    createRoomTrend.add(Date.now() - createTime);
 
-                            const myRoomInviteCode = creationPayload.message.split(': ').pop();
-                            check(myRoomInviteCode, { 'hopper extracted invite code': (c) => c && c.length > 0 });
+                    const myRoomInviteCode = payload.message.split(': ').pop();
+                    check(myRoomInviteCode, { 'hopper extracted invite code': (c) => c && c.length > 0 });
 
-                            // 2. The room is created, send a few messages
-                            sleep(1);
-                            socket.send(`say Hello from my new room!`);
-                            sleep(2);
-                            socket.send(`say It's nice here.`);
-                            sleep(2);
+                    socket.setTimeout(() => {
+                        socket.send(`say Hello from my new room!`);
+                    }, 1000); // 1s
 
-                            // 3. List users
-                            socket.send(`list users`);
-                            sleep(1);
+                    socket.setTimeout(() => {
+                        socket.send(`say It's nice here.`);
+                    }, 3000); // 1s + 2s
 
-                            // 4. Leave
-                            socket.send(`leave_room`);
-                            sleep(3);
+                    socket.setTimeout(() => {
+                        socket.send(`list users`);
+                    }, 5000); // 3s + 2s
 
-                            // 5. Join the "main" room
-                            socket.send(`join_room ${data.mainRoomInviteCode}`);
-                            sleep(5);
+                    socket.setTimeout(() => {
+                        socket.send(`leave_room`);
+                    }, 6000); // 5s + 1s
 
-                            // 6. End of iteration
-                            socket.close();
-                        }
-                    });
+                    socket.setTimeout(() => {
+                        socket.send(`join_room ${data.mainRoomInviteCode}`);
+                    }, 9000); // 6s + 3s
+
+                    socket.setTimeout(() => {
+                        socket.close();
+                    }, 14000); // 9s + 5s
                 }
             });
 
@@ -311,7 +307,6 @@ export function roomHopper(data) {
             });
 
             socket.setTimeout(() => {
-                // Failsafe in case the VU gets stuck
                 socket.close();
             }, 60000);
         });
