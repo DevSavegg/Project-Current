@@ -32,8 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ServerMain {
     private final int port;
 
-    // --- Define the number of resolver threads ---
-    // We now have 3 dedicated pools
+    // --- Number of resolver threads ---
     private static final int MANAGEMENT_RESOLVER_THREADS = 4;
     private static final int MESSAGE_RESOLVER_THREADS = 4;
 
@@ -44,7 +43,7 @@ public class ServerMain {
     public void run() throws Exception {
         // --- Create all queues ---
         BlockingQueue<ClientCommand> connectionQueue = new LinkedBlockingQueue<>();
-        BlockingQueue<ClientCommand> managementQueue = new LinkedBlockingQueue<>(); // <-- RE-ADDED
+        BlockingQueue<ClientCommand> managementQueue = new LinkedBlockingQueue<>();
 
         List<BlockingQueue<ClientCommand>> messageQueues = new ArrayList<>(MESSAGE_RESOLVER_THREADS);
         for (int i = 0; i < MESSAGE_RESOLVER_THREADS; i++) {
@@ -58,14 +57,14 @@ public class ServerMain {
                 messageQueues
         );
 
-        // --- Instantiate Services (as singletons) ---
+        // --- Instantiate Services ---
         CommandParser commandParser = new CommandParser();
         ClientRegistryService clientRegistry = new ClientRegistryServiceImpl();
         RoomRegistryService roomRegistry = new RoomRegistryServiceImpl();
         BroadcastService broadcastService = new BroadcastServiceImpl(clientRegistry, roomRegistry);
         FriendService friendService = new FriendServiceImpl();
 
-        // --- Instantiate the (now thread-safe) ResolverService ---
+        // --- Instantiate the ResolverService ---
         ResolverService resolverService = new ResolverService(
                 commandParser,
                 clientRegistry,
@@ -76,13 +75,13 @@ public class ServerMain {
 
         // --- Create thread pools for all resolver types ---
         ExecutorService connectionResolverPool = createNamedExecutor("Connection-Resolver", 1);
-        ExecutorService managementResolverPool = createNamedExecutor("Management-Resolver", MANAGEMENT_RESOLVER_THREADS); // <-- RE-ADDED
+        ExecutorService managementResolverPool = createNamedExecutor("Management-Resolver", MANAGEMENT_RESOLVER_THREADS);
         ExecutorService messageResolverPool = createNamedExecutor("Message-Resolver", MESSAGE_RESOLVER_THREADS);
 
         // Start the resolver threads
         connectionResolverPool.submit(new ResolverService.ConnectionWorker(connectionQueue, resolverService));
 
-        for (int i = 0; i < MANAGEMENT_RESOLVER_THREADS; i++) { // <-- RE-ADDED
+        for (int i = 0; i < MANAGEMENT_RESOLVER_THREADS; i++) {
             managementResolverPool.submit(new ResolverService.ManagementWorker(managementQueue, resolverService));
         }
 
@@ -98,7 +97,6 @@ public class ServerMain {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
-                    // Pass all required services to the gateway
                     .childHandler(new ChatServerInitializer(queueManager, commandParser, clientRegistry))
                     .option(ChannelOption.SO_BACKLOG, 1024)
                     .childOption(ChannelOption.SO_KEEPALIVE, true);

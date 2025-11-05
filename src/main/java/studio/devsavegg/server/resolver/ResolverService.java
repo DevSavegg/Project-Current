@@ -24,7 +24,6 @@ import java.util.stream.Collectors;
  */
 public class ResolverService {
 
-    // --- Services are all thread-safe or effectively final ---
     private final CommandParser commandParser;
     private final ClientRegistryService clientRegistry;
     private final RoomRegistryService roomRegistry;

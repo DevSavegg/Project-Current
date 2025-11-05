@@ -7,11 +7,6 @@
     <list default="true" id="cd5ae213-7670-4465-bcf6-730cd8721640" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/ServerMain.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/ServerMain.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/gateway/ChatGatewayHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/gateway/ChatGatewayHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/gateway/ChatServerInitializer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/gateway/ChatServerInitializer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/gateway/ClientCommand.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/gateway/ClientCommand.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/registry/ClientRegistryService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/registry/ClientRegistryService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/registry/ClientRegistryServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/registry/ClientRegistryServiceImpl.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/resolver/ResolverService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/studio/devsavegg/server/resolver/ResolverService.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
