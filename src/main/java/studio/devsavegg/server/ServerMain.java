@@ -26,14 +26,15 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ServerMain {
     private final int port;
 
     // --- Define the number of resolver threads ---
-    // Management threads (for /create, /join, etc.)
-    // Message threads (for /say, /dm)
-    private static final int MANAGEMENT_RESOLVER_THREADS = 2;
+    // We now have 3 dedicated pools
+    private static final int MANAGEMENT_RESOLVER_THREADS = 4;
     private static final int MESSAGE_RESOLVER_THREADS = 4;
 
     public ServerMain(int port) {
@@ -43,7 +44,7 @@ public class ServerMain {
     public void run() throws Exception {
         // --- Create all queues ---
         BlockingQueue<ClientCommand> connectionQueue = new LinkedBlockingQueue<>();
-        BlockingQueue<ClientCommand> managementQueue = new LinkedBlockingQueue<>();
+        BlockingQueue<ClientCommand> managementQueue = new LinkedBlockingQueue<>(); // <-- RE-ADDED
 
         List<BlockingQueue<ClientCommand>> messageQueues = new ArrayList<>(MESSAGE_RESOLVER_THREADS);
         for (int i = 0; i < MESSAGE_RESOLVER_THREADS; i++) {
@@ -57,14 +58,14 @@ public class ServerMain {
                 messageQueues
         );
 
-        // --- Instantiate Services ---
+        // --- Instantiate Services (as singletons) ---
         CommandParser commandParser = new CommandParser();
         ClientRegistryService clientRegistry = new ClientRegistryServiceImpl();
         RoomRegistryService roomRegistry = new RoomRegistryServiceImpl();
         BroadcastService broadcastService = new BroadcastServiceImpl(clientRegistry, roomRegistry);
         FriendService friendService = new FriendServiceImpl();
 
-        // --- Instantiate the ResolverService ---
+        // --- Instantiate the (now thread-safe) ResolverService ---
         ResolverService resolverService = new ResolverService(
                 commandParser,
                 clientRegistry,
@@ -74,19 +75,14 @@ public class ServerMain {
         );
 
         // --- Create thread pools for all resolver types ---
-        ExecutorService connectionResolverPool = Executors.newFixedThreadPool(1,
-                r -> new Thread(r, "Connection-Resolver-Thread-0"));
-
-        ExecutorService managementResolverPool = Executors.newFixedThreadPool(MANAGEMENT_RESOLVER_THREADS,
-                r -> new Thread(r, "Management-Resolver-Thread-" + r.hashCode()));
-
-        ExecutorService messageResolverPool = Executors.newFixedThreadPool(MESSAGE_RESOLVER_THREADS,
-                r -> new Thread(r, "Message-Resolver-Thread-" + r.hashCode()));
+        ExecutorService connectionResolverPool = createNamedExecutor("Connection-Resolver", 1);
+        ExecutorService managementResolverPool = createNamedExecutor("Management-Resolver", MANAGEMENT_RESOLVER_THREADS); // <-- RE-ADDED
+        ExecutorService messageResolverPool = createNamedExecutor("Message-Resolver", MESSAGE_RESOLVER_THREADS);
 
         // Start the resolver threads
         connectionResolverPool.submit(new ResolverService.ConnectionWorker(connectionQueue, resolverService));
 
-        for (int i = 0; i < MANAGEMENT_RESOLVER_THREADS; i++) {
+        for (int i = 0; i < MANAGEMENT_RESOLVER_THREADS; i++) { // <-- RE-ADDED
             managementResolverPool.submit(new ResolverService.ManagementWorker(managementQueue, resolverService));
         }
 
@@ -96,12 +92,13 @@ public class ServerMain {
 
         // --- Start Netty ---
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
-        EventLoopGroup workerGroup = new NioEventLoopGroup(0);
+        EventLoopGroup workerGroup = new NioEventLoopGroup();
 
         try {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
+                    // Pass all required services to the gateway
                     .childHandler(new ChatServerInitializer(queueManager, commandParser, clientRegistry))
                     .option(ChannelOption.SO_BACKLOG, 1024)
                     .childOption(ChannelOption.SO_KEEPALIVE, true);
@@ -123,5 +120,14 @@ public class ServerMain {
             broadcastService.shutdown();
             System.out.println("[ServerMain] Server shutdown complete.");
         }
+    }
+
+    /**
+     * Helper to create a named thread pool for easier debugging
+     */
+    private ExecutorService createNamedExecutor(String namePrefix, int size) {
+        AtomicInteger counter = new AtomicInteger(0);
+        ThreadFactory factory = r -> new Thread(r, namePrefix + "-" + counter.getAndIncrement());
+        return Executors.newFixedThreadPool(size, factory);
     }
 }

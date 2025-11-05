@@ -6,7 +6,6 @@ import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import studio.devsavegg.server.registry.ClientRegistryService;
-import studio.devsavegg.server.resolver.ClientCommandType;
 import studio.devsavegg.server.resolver.CommandParser;
 import studio.devsavegg.server.resolver.ParsedCommand;
 
@@ -29,7 +28,7 @@ public class ChatGatewayHandler extends SimpleChannelInboundHandler<TextWebSocke
     }
 
     /**
-     * Called when the WebSocket handshake is complete and the channel is active.
+     * Called when the WebSocket handshake is complete.
      */
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
@@ -38,14 +37,10 @@ public class ChatGatewayHandler extends SimpleChannelInboundHandler<TextWebSocke
 
             String uri = handshake.requestUri();
             QueryStringDecoder decoder = new QueryStringDecoder(uri);
-            Map<String, List<String>> params = decoder.parameters();
-
-            String initialUsername = getParam(params, "username");
+            String initialUsername = getParam(decoder.parameters(), "username");
 
             ClientCommand connectCommand = new ClientCommand(ctx.channel(), CommandType.CONNECT, initialUsername);
-
             putCommand(queueManager.connectionQueue(), connectCommand);
-
         } else {
             super.userEventTriggered(ctx, evt);
         }
@@ -58,27 +53,27 @@ public class ChatGatewayHandler extends SimpleChannelInboundHandler<TextWebSocke
     protected void channelRead0(ChannelHandlerContext ctx, TextWebSocketFrame frame) throws Exception {
         String message = frame.text();
 
-        // 1. Get the clientId from the registry using the channel
         String clientId = clientRegistry.getClientId(ctx.channel());
         if (clientId == null) {
-            // client sends a message before the
-            // CONNECT command has been fully processed
-            // treat it as a high-priority management command
-            System.err.println("[Gateway] Message received from unknown client (channel: " + ctx.channel().id() + "). Routing to management queue.");
-            putCommand(queueManager.managementQueue(), new ClientCommand(ctx.channel(), CommandType.MESSAGE, message));
+            System.err.println("[Gateway] Message received from un-registered client (channel: " + ctx.channel().id() + "). Discarding.");
             return;
         }
 
-        // 2. Parse the command
-        ParsedCommand parsedCommand = commandParser.parse(message);
-        ClientCommand clientCommand = new ClientCommand(ctx.channel(), CommandType.MESSAGE, message);
+        int contextVersion = clientRegistry.getContextVersion(clientId);
 
-        // 3. Route based on command type
+        ParsedCommand parsedCommand = commandParser.parse(message);
+
+        ClientCommand clientCommand = new ClientCommand(
+                ctx.channel(),
+                CommandType.MESSAGE,
+                message,
+                clientId,
+                contextVersion
+        );
+
         switch (parsedCommand.command()) {
             case SAY, DM:
-                int shardIndex = clientId.hashCode() % queueManager.getMessageQueueCount();
-                if (shardIndex < 0) shardIndex += queueManager.getMessageQueueCount();
-
+                int shardIndex = Math.abs(clientId.hashCode() % queueManager.getMessageQueueCount());
                 putCommand(queueManager.getMessageQueue(shardIndex), clientCommand);
                 break;
 
@@ -92,35 +87,26 @@ public class ChatGatewayHandler extends SimpleChannelInboundHandler<TextWebSocke
     }
 
     /**
-     * Called when a channel becomes inactive (client disconnected).
+     * Called when a client disconnects.
      */
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         //System.out.println("[Gateway] Client disconnected: " + ctx.channel().remoteAddress());
 
         ClientCommand disconnectCommand = new ClientCommand(ctx.channel(), CommandType.DISCONNECT, null);
-
         putCommand(queueManager.connectionQueue(), disconnectCommand);
     }
 
-    /**
-     * Called if an exception occurs.
-     */
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         System.err.println("[Gateway] Unhandled exception caught:");
         cause.printStackTrace();
 
         ClientCommand disconnectCommand = new ClientCommand(ctx.channel(), CommandType.DISCONNECT, null);
-
         putCommand(queueManager.connectionQueue(), disconnectCommand);
-
         ctx.close();
     }
 
-    /**
-     * Helper to put a command in the queue, handling potential interruptions.
-     */
     private void putCommand(BlockingQueue<ClientCommand> queue, ClientCommand command) {
         try {
             queue.put(command);
@@ -130,9 +116,6 @@ public class ChatGatewayHandler extends SimpleChannelInboundHandler<TextWebSocke
         }
     }
 
-    /**
-     * Helper to safely get the first value of a query parameter.
-     */
     private String getParam(Map<String, List<String>> params, String key) {
         if (params.containsKey(key) && !params.get(key).isEmpty()) {
             return params.get(key).getFirst();

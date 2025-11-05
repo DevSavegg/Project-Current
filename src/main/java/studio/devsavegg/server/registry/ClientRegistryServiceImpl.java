@@ -4,13 +4,15 @@ import io.netty.channel.Channel;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class ClientRegistryServiceImpl implements ClientRegistryService {
     private record Client(
             Channel channel,
             AtomicReference<String> username,
-            AtomicReference<String> context
+            AtomicReference<String> context,
+            AtomicInteger contextVersion
     ) {}
 
     private final Map<String, Client> clients = new ConcurrentHashMap<>();
@@ -22,7 +24,8 @@ public class ClientRegistryServiceImpl implements ClientRegistryService {
         Client newClient = new Client(
                 channel,
                 new AtomicReference<>(clientId),
-                new AtomicReference<>(null)
+                new AtomicReference<>(null),
+                new AtomicInteger(0)
         );
 
         clients.put(clientId, newClient);
@@ -68,6 +71,8 @@ public class ClientRegistryServiceImpl implements ClientRegistryService {
         Client client = clients.get(clientId);
         if (client != null) {
             client.context().set(contextId);
+
+            int newVersion = client.contextVersion().incrementAndGet();
             // System.out.println("[ClientRegistry] Client " + clientId + " context set to: " + contextId);
         }
     }
@@ -91,5 +96,11 @@ public class ClientRegistryServiceImpl implements ClientRegistryService {
     @Override
     public int getTotalClientCount() {
         return clients.size();
+    }
+
+    @Override
+    public int getContextVersion(String clientId) {
+        Client client = clients.get(clientId);
+        return (client != null) ? client.contextVersion().get() : -1;
     }
 }

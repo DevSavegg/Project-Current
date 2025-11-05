@@ -43,7 +43,7 @@ public class ResolverService {
         this.friendService = friendService;
     }
 
-    public void processCommand(ClientCommand command) {
+    public void processConnectionCommand(ClientCommand command) {
         try {
             switch (command.commandType()) {
                 case CONNECT:
@@ -52,25 +52,40 @@ public class ResolverService {
                 case DISCONNECT:
                     handleDisconnect(command.channel());
                     break;
-                case MESSAGE:
-                    handleClientMessage(command.channel(), command.payload());
-                    break;
+                default:
+                    System.err.println("[ConnectionWorker] Received non-connection command: " + command.commandType());
             }
         } catch (Exception e) {
-            System.err.println("[ResolverService] CRITICAL ERROR processing command: " + e.getMessage());
+            System.err.println("[ConnectionWorker] CRITICAL ERROR: " + e.getMessage());
             e.printStackTrace();
-
-            broadcastService.sendError(
-                    command.channel(),
-                    500,
-                    (command.payload() != null ? command.payload() : "UNKNOWN"),
-                    "An internal server error occurred while processing your request."
-            );
+            if (command.channel().isOpen()) {
+                broadcastService.sendError(command.channel(), 500, "INTERNAL", "Internal error processing connection event.");
+            }
         }
     }
 
     public void processManagementCommand(ClientCommand command) {
-        processCommand(command);
+        try {
+            handleClientMessage(command.channel(), command.clientId(), command.payload(), command.contextVersion(), true);
+        } catch (Exception e) {
+            System.err.println("[ManagementWorker] CRITICAL ERROR: " + e.getMessage());
+            e.printStackTrace();
+            if (command.channel().isOpen()) {
+                broadcastService.sendError(command.channel(), 500, "INTERNAL", "Internal error processing management command.");
+            }
+        }
+    }
+
+    public void processMessageCommand(ClientCommand command) {
+        try {
+            handleClientMessage(command.channel(), command.clientId(), command.payload(), command.contextVersion(), false);
+        } catch (Exception e) {
+            System.err.println("[MessageWorker] CRITICAL ERROR: " + e.getMessage());
+            e.printStackTrace();
+            if (command.channel().isOpen()) {
+                broadcastService.sendError(command.channel(), 500, "INTERNAL", "Internal error processing message command.");
+            }
+        }
     }
 
     public static class ConnectionWorker implements Runnable {
@@ -85,7 +100,7 @@ public class ResolverService {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     ClientCommand command = queue.take();
-                    resolver.processCommand(command);
+                    resolver.processConnectionCommand(command);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
@@ -127,7 +142,7 @@ public class ResolverService {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     ClientCommand command = queue.take();
-                    resolver.processCommand(command);
+                    resolver.processMessageCommand(command);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
@@ -167,29 +182,29 @@ public class ResolverService {
     private void handleDisconnect(Channel channel) {
         String clientId = clientRegistry.getClientId(channel);
         if (clientId == null) {
-            System.err.println("[ResolverService] Disconnect from unknown channel: " + channel.remoteAddress());
+            System.err.println("[ConnectionWorker] Disconnect from unknown channel: " + channel.remoteAddress());
             return;
         }
 
         String currentContextId = clientRegistry.getClientContext(clientId);
+        String username = clientRegistry.getUsername(clientId);
 
         roomRegistry.removeClientFromAllRooms(clientId);
         clientRegistry.unregisterClient(clientId);
 
-        //System.out.println("[ResolverService] Client disconnected: " + clientId);
+        //System.out.println("[ConnectionWorker] Client disconnected: " + clientId);
 
         if (currentContextId != null && currentContextId.startsWith("room-")) {
             broadcastService.broadcastSystemMessageToRoom(
                     currentContextId,
                     "USER_LEAVE",
-                    "User '" + clientRegistry.getUsername(clientId) + "' (" + clientId + ") has left.", // Use username
+                    "User '" + username + "' (" + clientId + ") has left.",
                     Map.of("userId", clientId)
             );
         }
     }
 
-    private void handleClientMessage(Channel channel, String rawMessage) {
-        String clientId = clientRegistry.getClientId(channel);
+    private void handleClientMessage(Channel channel, String clientId, String rawMessage, int commandVersion, boolean isHighPriority) {
         if (clientId == null) {
             broadcastService.sendError(channel, 401, "UNKNOWN", "You are not registered. Please reconnect.");
             return;
@@ -199,6 +214,16 @@ public class ResolverService {
         if (command == null || command.command() == ClientCommandType.UNKNOWN) {
             broadcastService.sendError(channel, 400, rawMessage, "Unknown command. Type /help for commands.");
             return;
+        }
+
+        // --- STALE COMMAND CHECK ---
+        if (!isHighPriority) {
+            int currentVersion = clientRegistry.getContextVersion(clientId);
+            if (commandVersion != currentVersion) {
+                System.out.println("[MessageWorker] Discarding stale command " + command.command() + " for " + clientId
+                        + " (CmdV: " + commandVersion + ", ClientV: " + currentVersion + ")");
+                return;
+            }
         }
 
         switch (command.command()) {
@@ -322,12 +347,10 @@ public class ResolverService {
             broadcastService.sendError(clientChannel, 400, "DM", "Usage: /dm <user_id>");
             return;
         }
-
         if (clientId.equals(targetClientId)) {
             broadcastService.sendError(clientChannel, 400, "DM", "You cannot send a DM to yourself.");
             return;
         }
-
         if (!clientRegistry.isClientOnline(targetClientId)) {
             broadcastService.sendError(clientChannel, 404, "DM", "Error: User '" + targetClientId + "' is not online.");
             return;

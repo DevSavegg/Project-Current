@@ -71,4 +71,11 @@ public interface ClientRegistryService {
      * @return The count of online clients.
      */
     int getTotalClientCount();
+
+    /**
+     * Gets the client's current "context version".
+     * @param clientId The client's ID.
+     * @return The current version number, or -1 if client not found.
+     */
+    int getContextVersion(String clientId);
 }
