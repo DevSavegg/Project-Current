@@ -22,6 +22,7 @@ public class ClientCli {
 
     private static String WS_URL = "ws://localhost:8080/chat";
 
+
     private static final String RESET = "\u001B[0m";
     private static final String BOLD  = "\u001B[1m";
 
@@ -89,7 +90,9 @@ public class ClientCli {
                 .join();
 
         // loop รับ input
+
         Thread inputThread = new Thread(() -> {
+            String name = "null";
             Scanner sc = new Scanner(System.in);
             while (true) {
                 if (!sc.hasNextLine()) break;
@@ -98,9 +101,9 @@ public class ClientCli {
 
                 // แยก command / args
                 String[] parts = line.split("\\s+", 2);
+
                 String rawCmd = parts[0];
                 String argsPart = (parts.length > 1) ? parts[1] : "";
-
                 // ตัด '/' ออกถ้ามี
                 if (rawCmd.startsWith("/")) {
                     rawCmd = rawCmd.substring(1);
@@ -112,7 +115,9 @@ public class ClientCli {
                     try { ws.sendClose(WebSocket.NORMAL_CLOSURE, "bye").join(); } catch (Exception ignored) {}
                     break;
                 }
-
+                if (lowerBase.equals("set_name")) {
+                    name = argsPart;
+                }
                 if (lowerBase.equals("clear")) {
                     clearScreen();
                     printBootScreen();
@@ -131,10 +136,12 @@ public class ClientCli {
                 // ---------- คำสั่งที่ส่งไป server ----------
                 // ส่งในรูปแบบ: create_room A, join_room A, set_name Alice, ...
                 String canonical = rawCmd + (argsPart.isEmpty() ? "" : " " + argsPart);
-
+                if (lowerBase.equals("say")) {
+                    canonical = rawCmd + " "+name+" : "+argsPart;
+                }
                 try {
                     ws.sendText(canonical, true).join();
-                    printOutgoing(canonical);
+                    printOutgoing(rawCmd + (argsPart.isEmpty() ? "" : " " + argsPart));
                 } catch (CompletionException | IllegalStateException e) {
                     printError("SEND FAILED: " + e.getMessage());
                 }
